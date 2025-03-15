@@ -2,6 +2,7 @@
 unsigned char CONTROL;  // Control signals for ALU operations
 unsigned char BUS;      // Data bus
 unsigned char MBR;      // Memory Buffer Register
+unsigned char FLAGS;    // Flags register [OF -- -- -- SF CF ZF]
 
 // Function to calculate two's complement of a number
 unsigned char twosComp(unsigned char value) {
@@ -10,8 +11,29 @@ unsigned char twosComp(unsigned char value) {
 
 // Function to set flags based on ALU operation result
 void setFlags(int result) {
-    // Flag setting implementation will go here
-    // Typically includes Zero flag, Carry flag, etc.
+    // Clear all flags first
+    FLAGS &= 0x40;  // Clear all flags except bit 6 which is unused
+    
+    // Set Zero Flag (ZF) - bit 0
+    if((result & 0xFF) == 0) {
+        FLAGS |= 0x01;
+    }
+    
+    // Set Carry Flag (CF) - bit 1
+    if(result > 0xFF) {
+        FLAGS |= 0x02;
+    }
+    
+    // Set Sign Flag (SF) - bit 2
+    if(result & 0x80) {
+        FLAGS |= 0x04;
+    }
+    
+    // Set Overflow Flag (OF) - bit 7
+    // Overflow occurs when result cannot be represented in 8 bits
+    if(result > 0xFF || result < 0) {
+        FLAGS |= 0x80;
+    }
 }
 
 int ALU(void) {
