@@ -326,19 +326,61 @@ int main() {
     PC = 0;
     FLAGS = 0;
     
-    // Example program from Appendix A (machine code)
-    memory[0x000] = WB;    memory[0x001] = 0x05;  // WB 0x05
+    // Program from Appendix A
+    // First section: Initial operations and memory setup
+    memory[0x000] = WB;    memory[0x001] = 0x15;  // WB 0x15
     memory[0x002] = WM;    memory[0x003] = 0x04;  memory[0x004] = 0x00;  // WM 0x400
-    memory[0x005] = WB;    memory[0x006] = 0x03;  // WB 0x03
-    memory[0x007] = WM;    memory[0x008] = 0x04;  memory[0x009] = 0x01;  // WM 0x401
-    memory[0x00A] = RM;    memory[0x00B] = 0x04;  memory[0x00C] = 0x00;  // RM 0x400
-    memory[0x00D] = WACC;  // WACC
-    memory[0x00E] = RM;    memory[0x00F] = 0x04;  memory[0x010] = 0x01;  // RM 0x401
-    memory[0x011] = ADD;   // ADD
-    memory[0x012] = RACC;  // RACC
-    memory[0x013] = WM;    memory[0x014] = 0x04;  memory[0x015] = 0x02;  // WM 0x402
-    memory[0x016] = EOP;   // EOP
-    
+    memory[0x004] = WB;    memory[0x005] = 0x05;  // WB 0x05
+    memory[0x006] = WACC;  // WACC
+    memory[0x008] = WB;    memory[0x009] = 0x08;  // WB 0x08
+    memory[0x00A] = ADD;   // ADD
+    memory[0x00C] = RM;    memory[0x00D] = 0x04;  memory[0x00E] = 0x00;  // RM 0x400
+    memory[0x00E] = MUL;   // MUL
+    memory[0x010] = RACC;  // RACC
+    memory[0x012] = WM;    memory[0x013] = 0x04;  memory[0x014] = 0x01;  // WM 0x401
+
+    // I/O operations
+    memory[0x014] = WIB;   memory[0x015] = 0x0B;  // WIB 0x0B
+    memory[0x016] = WIO;   memory[0x017] = 0x00;  memory[0x018] = 0x00;  // WIO 0x000
+    memory[0x018] = WB;    memory[0x019] = 0x10;  // WB 0x10
+    memory[0x01A] = SUB;   // SUB
+    memory[0x01C] = RACC;  // RACC
+    memory[0x01E] = WIO;   memory[0x01F] = 0x00;  memory[0x020] = 0x01;  // WIO 0x001
+
+    // Shift operations
+    memory[0x020] = SHL;   // SHL
+    memory[0x022] = SHL;   // SHL
+    memory[0x024] = RM;    memory[0x025] = 0x04;  memory[0x026] = 0x01;  // RM 0x401
+    memory[0x026] = SHR;   // SHR
+    memory[0x028] = OR;    // OR
+    memory[0x02A] = NOT;   // NOT
+
+    // I/O and logical operations
+    memory[0x02C] = RIO;   memory[0x02D] = 0x00;  memory[0x02E] = 0x01;  // RIO 0x001
+    memory[0x02E] = SWAP;  // SWAP
+    memory[0x030] = XOR;   // XOR
+    memory[0x032] = WB;    memory[0x033] = 0xFF;  // WB 0xFF
+    memory[0x034] = AND;   // AND
+
+    // Branch operations
+    memory[0x036] = RM;    memory[0x037] = 0x04;  memory[0x038] = 0x01;  // RM 0x401
+    memory[0x038] = BRE;   memory[0x039] = 0x03;  memory[0x03A] = 0x0C;  // BRE 0x03C
+    memory[0x03A] = WM;    memory[0x03B] = 0x00;  memory[0x03C] = 0xF0;  // WM 0xF0
+    memory[0x03C] = BRGT;  memory[0x03D] = 0x04;  memory[0x03E] = 0x00;  // BRGT 0x040
+    memory[0x03E] = BRLT;  memory[0x03F] = 0x04;  memory[0x040] = 0x04;  // BRLT 0x044
+    memory[0x040] = WB;    memory[0x041] = 0x00;  // WB 0x00 (unreachable)
+    memory[0x042] = WACC;  // WACC (unreachable)
+    memory[0x044] = WB;    memory[0x045] = 0x03;  // WB 0x03
+    memory[0x046] = WACC;  // WACC
+
+    // Controlled loop
+    memory[0x048] = WB;    memory[0x049] = 0x00;  // WB 0x00
+    memory[0x04A] = BRE;   memory[0x04B] = 0x05;  memory[0x04C] = 0x02;  // BRE 0x052
+    memory[0x04C] = WB;    memory[0x04D] = 0x01;  // WB 0x01
+    memory[0x04E] = SUB;   // SUB
+    memory[0x050] = BR;    memory[0x051] = 0x04;  memory[0x052] = 0x08;  // BR 0x048
+    memory[0x052] = EOP;   // EOP
+
     // Execute program
     unsigned char inst;
     unsigned short addr;
@@ -348,19 +390,30 @@ int main() {
         if(inst == EOP) break;
         
         // For instructions that need address
-        if(inst == WM || inst == RM) {
+        if(inst == WM || inst == RM || inst == WIO || inst == RIO || 
+            inst == BR || inst == BRE || inst == BRNE || inst == BRGT || inst == BRLT) {
             addr = (memory[PC] << 8) | memory[PC + 1];
             PC += 2;
         }
         
         CU(inst, addr);
+        
+        // Debug output
+        printf("PC: 0x%03X, Inst: 0x%02X, ACC: 0x%02X, Flags: 0x%02X\n", 
+               PC, inst, ALU(), FLAGS);
     }
     
-    // Print results
-    printf("Final memory contents:\n");
-    printf("0x400: %02X\n", memory[0x400]);
-    printf("0x401: %02X\n", memory[0x401]);
-    printf("0x402: %02X\n", memory[0x402]);
+    // Print final results
+    printf("\nFinal memory contents:\n");
+    printf("Memory 0x400: 0x%02X\n", memory[0x400]);
+    printf("Memory 0x401: 0x%02X\n", memory[0x401]);
+    printf("I/O Buffer 0x000: 0x%02X\n", io_memory[0x000]);
+    printf("I/O Buffer 0x001: 0x%02X\n", io_memory[0x001]);
+    printf("Final Flags: ZF=%d CF=%d SF=%d OF=%d\n",
+           (FLAGS & 0x01) ? 1 : 0,
+           (FLAGS & 0x02) ? 1 : 0,
+           (FLAGS & 0x04) ? 1 : 0,
+           (FLAGS & 0x80) ? 1 : 0);
     
     return 0;
 } 
