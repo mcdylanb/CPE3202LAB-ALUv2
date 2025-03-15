@@ -1,5 +1,9 @@
 #include <stdio.h>
 
+//members:
+//Nino Angelo Balagtas - Leader
+//Mac Dylan Philippe Balagtas 
+
 // Global control signals and data bus
 unsigned char CONTROL;    // Control signals for ALU operations
 unsigned char BUS;       // Data bus
