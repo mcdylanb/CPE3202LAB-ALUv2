@@ -4,6 +4,7 @@
 unsigned char CONTROL;    // Control signals for ALU operations
 unsigned char BUS;       // Data bus
 unsigned char MBR;       // Memory Buffer Register
+unsigned char IOBR;      // I/O Buffer Register
 unsigned char FLAGS;     // Flags register [OF -- -- -- SF CF ZF]
 unsigned char IOM;       // I/O or Memory select
 unsigned char RW;        // Read/Write control
@@ -17,28 +18,36 @@ unsigned short PC;       // Program Counter
 unsigned char memory[0x1000];  // 4KB of main memory
 unsigned char io_memory[0x100]; // 256B of I/O memory
 
-// Operation codes
-#define ADD  0x1E    // Addition
-#define SUB  0x1D    // Subtraction
-#define MUL  0x1B    // Multiplication
-#define DIV  0x1C    // Division
-#define AND  0x19    // Logical AND
-#define OR   0x18    // Logical OR
-#define XOR  0x17    // Logical XOR
-#define NOT  0x16    // Logical NOT
-#define SHL  0x1A    // Shift Left
-#define SHR  0x15    // Shift Right
-#define WACC 0x30    // Write to ACC
-#define RACC 0x31    // Read from ACC
-#define WB   0x32    // Write Byte to MBR
-#define WM   0x33    // Write MBR to Memory
-#define RM   0x34    // Read Memory to MBR
-#define CMP  0x14    // Compare
-#define BRE  0x40    // Branch if Equal
-#define BRNE 0x41    // Branch if Not Equal
-#define BRGT 0x42    // Branch if Greater Than
-#define BRLT 0x43    // Branch if Less Than
-#define EOP  0xFF    // End of Program
+// Operation codes (based on Table 1)
+// Arithmetic & Logical Operations
+#define ADD  0x3C    // 111100 - Add
+#define SUB  0x3A    // 111010 - Subtract
+#define MUL  0x36    // 110110 - Multiply
+#define AND  0x34    // 110100 - AND
+#define OR   0x32    // 110010 - OR
+#define NOT  0x30    // 110000 - NOT
+#define XOR  0x2E    // 101110 - XOR
+#define SHL  0x2C    // 101100 - Shift Left
+#define SHR  0x2A    // 101010 - Shift Right
+
+// Data Movement
+#define WM   0x02    // 000010 - Write Memory
+#define RM   0x04    // 000100 - Read Memory
+#define RIO  0x08    // 001000 - Read IO
+#define WIO  0x0A    // 001010 - Write IO
+#define WB   0x0C    // 001100 - Write Byte to MBR
+#define WIB  0x0E    // 001110 - Write Byte to IOBR
+#define WACC 0x12    // 010010 - Write to ACC
+#define RACC 0x16    // 010110 - Read from ACC
+#define SWAP 0x1C    // 011100 - Swap MBR and IOBR
+
+// Program Control
+#define BR   0x06    // 000110 - Branch
+#define BRE  0x28    // 101000 - Branch if Equal
+#define BRNE 0x26    // 100110 - Branch if Not Equal
+#define BRGT 0x24    // 100100 - Branch if Greater Than
+#define BRLT 0x22    // 100010 - Branch if Less Than
+#define EOP  0x3E    // 111110 - End of Program
 
 // Function to calculate two's complement
 unsigned char twosComp(unsigned char value) {
@@ -120,13 +129,6 @@ int ALU(void) {
             ACC = (unsigned char)temp_ACC;
             break;
             
-        case DIV:  // Division
-            if(BUS != 0) {
-                temp_ACC = (int)ACC / BUS;
-                ACC = (unsigned char)temp_ACC;
-            }
-            break;
-            
         case AND:  // Logical AND
             temp_ACC = ACC & BUS;
             ACC = (unsigned char)temp_ACC;
@@ -157,12 +159,6 @@ int ALU(void) {
             ACC = (unsigned char)temp_ACC;
             break;
             
-        case CMP:  // Compare
-            temp_ACC = (int)ACC - BUS;
-            // Only set flags, don't modify ACC
-            setFlags(temp_ACC);
-            return ACC;
-            
         case WACC: // Write to ACC
             ACC = BUS;
             temp_ACC = ACC;
@@ -186,6 +182,13 @@ void CU(unsigned char inst_code, unsigned short address) {
             Memory = 0;
             IO = 0;
             // MBR will be set by the next instruction byte
+            break;
+            
+        case WIB:   // Write Byte to IOBR
+            Fetch = 1;
+            Memory = 0;
+            IO = 0;
+            // IOBR will be set by the next instruction byte
             break;
             
         case WM:    // Write MBR to Memory
@@ -212,18 +215,52 @@ void CU(unsigned char inst_code, unsigned short address) {
             }
             break;
             
+        case RIO:   // Read IO
+            Fetch = 0;
+            Memory = 0;
+            IO = 1;
+            IOM = 1;
+            RW = 0;
+            OE = 1;
+            if(IO) {
+                IOBR = io_memory[address];
+            }
+            break;
+            
+        case WIO:   // Write IO
+            Fetch = 0;
+            Memory = 0;
+            IO = 1;
+            IOM = 1;
+            RW = 1;
+            OE = 0;
+            if(IO) {
+                io_memory[address] = IOBR;
+            }
+            break;
+            
+        case SWAP:  // Swap MBR and IOBR
+            {
+                unsigned char temp = MBR;
+                MBR = IOBR;
+                IOBR = temp;
+            }
+            break;
+            
+        case BR:    // Unconditional Branch
+            PC = address;
+            break;
+            
         // Arithmetic and Logic Operations
         case ADD:
         case SUB:
         case MUL:
-        case DIV:
         case AND:
         case OR:
         case XOR:
         case NOT:
         case SHL:
         case SHR:
-        case CMP:
             Fetch = 0;
             Memory = 1;
             IO = 0;
